@@ -80,6 +80,9 @@ def get_parser():
     parser.add_argument('--augment',action='store_true',default=False)
     parser.add_argument('--lead_bbox',action='store_true',default=False)
 
+    parser.add_argument('--remove_grid_units',action='store_false',default=True,dest='grid_units')
+    parser.add_argument('--separate_leads', action='store_true', default=False)
+
     return parser
 
 def writeCSV(args):
@@ -130,7 +133,15 @@ def run_single_file(args):
 
         configs = read_config_file(os.path.join(os.getcwd(), args.config_file))
 
-        out_array = get_paper_ecg(input_file=filename,header_file=header, configs=configs, mask_unplotted_samples=args.mask_unplotted_samples, start_index=args.start_index, store_configs=args.store_config, store_text_bbox=args.lead_name_bbox, output_directory=args.output_directory,resolution=resolution,papersize=papersize,add_lead_names=lead,add_dc_pulse=bernoulli_dc,add_bw=bernoulli_bw,show_grid=bernoulli_grid,add_print=bernoulli_add_print,pad_inches=padding,font_type=font,standard_colours=standard_colours,full_mode=args.full_mode,bbox = args.lead_bbox, columns = args.num_columns, seed=args.seed)
+        out_array = get_paper_ecg(input_file=filename,header_file=header, configs=configs, 
+                                  mask_unplotted_samples=args.mask_unplotted_samples, 
+                                  start_index=args.start_index, store_configs=args.store_config, 
+                                  store_text_bbox=args.lead_name_bbox, output_directory=args.output_directory,
+                                  resolution=resolution,papersize=papersize,add_lead_names=lead,
+                                  add_dc_pulse=bernoulli_dc,add_bw=bernoulli_bw,show_grid=bernoulli_grid,add_print=bernoulli_add_print,
+                                  pad_inches=padding,font_type=font,standard_colours=standard_colours,full_mode=args.full_mode,
+                                  bbox = args.lead_bbox, columns = args.num_columns, seed=args.seed, 
+                                  grid_units=args.grid_units, separate_leads=args.separate_leads)
         
         for out in out_array:
             if args.store_config:

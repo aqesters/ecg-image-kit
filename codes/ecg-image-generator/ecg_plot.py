@@ -89,7 +89,9 @@ def ecg_plot(
         json_dict=dict(),
         start_index=-1,
         store_configs=0,
-        lead_length_in_seconds=10
+        lead_length_in_seconds=10,
+        grid_units=True,
+        separate_leads=False
         ):
     #Inputs :
     #ecg - Dictionary of ecg signal with lead names as keys
@@ -483,8 +485,9 @@ def ecg_plot(
                 y_offset -= 0.5
 
     #change x and y res
-    ax.text(2, 0.5, '25mm/s', fontsize=lead_fontsize)
-    ax.text(4, 0.5, '10mm/mV', fontsize=lead_fontsize)
+    if grid_units:
+        ax.text(2, 0.5, '25mm/s', fontsize=lead_fontsize)
+        ax.text(4, 0.5, '10mm/mV', fontsize=lead_fontsize)
     
     if(show_grid):
         ax.set_xticks(np.arange(x_min,x_max,x_grid_size))    
