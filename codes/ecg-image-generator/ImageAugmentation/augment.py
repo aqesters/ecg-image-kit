@@ -37,8 +37,8 @@ def get_augment(input_file,output_directory,rotate=25,noise=25,crop=0.01,tempera
     lead_bbs = []
     leadNames_bbs = []
     
-         
-    lead_bbs, leadNames_bbs, lead_bbs_labels, startTime_bbs, endTime_bbs, plotted_pixels = read_leads(json_dict['leads'])
+    if json_dict is not None:
+        lead_bbs, leadNames_bbs, lead_bbs_labels, startTime_bbs, endTime_bbs, plotted_pixels = read_leads(json_dict['leads'])
     
     if bbox:
         lead_bbs = BoundingBoxesOnImage(lead_bbs, shape=image.shape)
@@ -47,34 +47,35 @@ def get_augment(input_file,output_directory,rotate=25,noise=25,crop=0.01,tempera
     
     images = [image[:, :, :3]]
     h, w, _ = image.shape
-    rot = random.randint(-rotate, rotate)
-    crop_sample = random.uniform(0, crop)
-    #Augment in a sequential manner. Create an augmentation object
-    seq = iaa.Sequential([
-          iaa.Affine(rotate=rot),
-          iaa.AdditiveGaussianNoise(scale=(noise, noise)),
-          iaa.Crop(percent=crop_sample),
-          iaa.ChangeColorTemperature(temperature)
-          ])
+
+    # Augment in a sequential manner. Create an augmentation object
+    augs = []
+    augs.append(iaa.Affine(rotate=rotate))
+    augs.append(iaa.AdditiveGaussianNoise(scale=(noise)))
+    augs.append(iaa.Crop(percent=crop))
+    if temperature != None:
+        augs.append(iaa.ChangeColorTemperature(temperature))
+    seq = iaa.Sequential(augs)
     
     images_aug = seq(images=images)
 
     if bbox:
-        augmented_lead_bbs = rotate_bounding_box(lead_bbs, [h/2,w/2], -rot)
+        augmented_lead_bbs = rotate_bounding_box(lead_bbs, [h/2,w/2], -rotate)
     else:
         augmented_lead_bbs = []    
     if store_text_bounding_box:
-        augmented_leadName_bbs = rotate_bounding_box(leadNames_bbs, [h/2,w/2], -rot)
+        augmented_leadName_bbs = rotate_bounding_box(leadNames_bbs, [h/2,w/2], -rotate)
     else:
         augmented_leadName_bbs = []   
 
-    rotated_pixel_coordinates = rotate_points(plotted_pixels, [h/2, w/2], -rot)
+    rotated_pixel_coordinates = rotate_points(plotted_pixels, [h/2, w/2], -rotate)
 
     if bbox or store_text_bounding_box:
         json_dict['leads'] = convert_bounding_boxes_to_dict(augmented_lead_bbs, augmented_leadName_bbs, lead_bbs_labels, startTime_bbs, endTime_bbs, rotated_pixel_coordinates)
 
     head, tail = os.path.split(filename)
 
+    # Save the augmented image
     f = os.path.join(output_directory,tail)
     plt.imsave(fname=f,arr=images_aug[0])
 

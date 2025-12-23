@@ -17,6 +17,8 @@ import random
 
 # Run script.
 def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,add_bw,show_grid, add_print, configs, mask_unplotted_samples = False, start_index = -1, store_configs=False, store_text_bbox=True,key='val',resolution=100,units='inches',papersize='',add_lead_names=True,pad_inches=1,template_file=os.path.join('TemplateFiles','TextFile1.txt'),font_type=os.path.join('Fonts','Times_New_Roman.ttf'),standard_colours=5,full_mode='II',bbox = False,columns=-1, grid_units=True, separate_leads=False):
+    
+    duplicate_datafiles = False     # internal flag, determines if input data files are copied to output directory
 
     # Extract a reduced-lead set from each pair of full-lead header and recording files.
     full_header_file = header_file
@@ -33,9 +35,10 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
 
     head, tail = os.path.split(full_header_file)
 
-    output_header_file = os.path.join(output_directory, tail)
-    with open(output_header_file, 'w') as f:
-            f.write('\n'.join(full_lines))
+    if duplicate_datafiles:
+        output_header_file = os.path.join(output_directory, tail)
+        with open(output_header_file, 'w') as f:
+                f.write('\n'.join(full_lines))
 
     #Load the full-lead recording file, extract the lead data, and save the reduced-lead recording file.
     recording = load_recording(full_recording_file, full_header,key)
@@ -243,9 +246,12 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
                 ecg_frame.append(frame)
                 start = start + int(rate*abs_lead_step)
     outfile_array = []
+    leadfile_array = []
     
     name, ext = os.path.splitext(full_header_file)
-    write_wfdb_file(segmented_ecg_data, name, rate, header_file, output_directory, full_mode, mask_unplotted_samples)
+    
+    if duplicate_datafiles:
+        write_wfdb_file(segmented_ecg_data, name, rate, header_file, output_directory, full_mode, mask_unplotted_samples)
 
     if len(ecg_frame) == 0:
         return outfile_array
@@ -253,9 +259,9 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
     start = 0
 
     # For debugging
-    print("ecg_frame:")
-    for key, data in ecg_frame[0].items():
-        print(f"{key}: {len(data)} measurements")
+    #print("ecg_frame:")
+    #for key, data in ecg_frame[0].items():
+    #    print(f"{key}: {len(data)} measurements")
     # End debugging
 
     for i in range(len(ecg_frame)):
@@ -275,31 +281,35 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
         if ecg_frame[i] == {}:
             continue
         
+        # Plot ECG data with all leads
+        x_grid,y_grid = ecg_plot(ecg_frame[i], configs=configs, full_header_file=full_header_file, 
+                                style=grid_colour, sample_rate = rate,columns=columns,rec_file_name = rec_file, 
+                                output_dir = output_directory, resolution = resolution, pad_inches = pad_inches, 
+                                lead_index=full_leads, full_mode = full_mode, store_text_bbox = store_text_bbox, 
+                                show_lead_name=add_lead_names,show_dc_pulse=dc,papersize=papersize,show_grid=(grid),
+                                standard_colours=standard_colours,bbox=bbox, print_txt=print_txt, json_dict=json_dict, 
+                                start_index=start, store_configs=store_configs, lead_length_in_seconds=lead_length_in_seconds,
+                                grid_units=grid_units, separate_leads=False, show_dividers=True)
+        
+        # If selected, also plot each lead in separate images
+        leadfiles = []
         if separate_leads:
             for key, data in ecg_frame[i].items():
-                # Debugging
-                print(f"Plotting for {key}")
-                # End debugging
-                rec_file = rec_file + '-' + key
+                lead_file = rec_file + '-' + key    # File name for each lead
+                lead_list = [lead if lead == key else '' for lead in full_leads]    # Create list with only the current lead but full length
+
                 x_grid,y_grid = ecg_plot({key: data}, configs=configs, full_header_file=full_header_file, 
-                                 style=grid_colour, sample_rate = rate,columns=columns,rec_file_name = rec_file, 
+                                 style=grid_colour, sample_rate = rate,columns=columns,rec_file_name = lead_file, 
                                  output_dir = output_directory, resolution = resolution, pad_inches = pad_inches, 
-                                 lead_index=[key], full_mode = full_mode, store_text_bbox = store_text_bbox, 
-                                 show_lead_name=add_lead_names,show_dc_pulse=dc,papersize=papersize,show_grid=(False),
+                                 lead_index=lead_list, full_mode = full_mode, store_text_bbox = store_text_bbox, 
+                                 show_lead_name=True,show_dc_pulse=dc,papersize=papersize,show_grid=(False),
                                  standard_colours=standard_colours,bbox=bbox, print_txt=print_txt, json_dict=json_dict, 
                                  start_index=start, store_configs=store_configs, lead_length_in_seconds=lead_length_in_seconds,
-                                 grid_units=False, separate_leads=separate_leads)
-        else:
-            x_grid,y_grid = ecg_plot(ecg_frame[i], configs=configs, full_header_file=full_header_file, 
-                                 style=grid_colour, sample_rate = rate,columns=columns,rec_file_name = rec_file, 
-                                 output_dir = output_directory, resolution = resolution, pad_inches = pad_inches, 
-                                 lead_index=full_leads, full_mode = full_mode, store_text_bbox = store_text_bbox, 
-                                 show_lead_name=add_lead_names,show_dc_pulse=dc,papersize=papersize,show_grid=(grid),
-                                 standard_colours=standard_colours,bbox=bbox, print_txt=print_txt, json_dict=json_dict, 
-                                 start_index=start, store_configs=store_configs, lead_length_in_seconds=lead_length_in_seconds,
-                                 grid_units=grid_units, separate_leads=separate_leads)
-        # For debugging
-        print(f"X_grid: {x_grid}\nY_grid: {y_grid}")
+                                 grid_units=False, separate_leads=separate_leads, show_dividers=False)
+
+                # Keep track of filenames with separate leads
+                leadfile_head, leadfile_tail = os.path.split(lead_file)
+                leadfiles.append(os.path.join(output_directory,leadfile_tail+'.png'))
 
         rec_head, rec_tail = os.path.split(rec_file)
         
@@ -316,6 +326,7 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
             json_dict["number_of_columns_in_image"] = columns
             json_dict["full_mode_lead"] =full_mode
 
+        # Keep track of filenames for whole images (all leads in one page)
         outfile = os.path.join(output_directory,rec_tail+'.png')
 
         json_object = json.dumps(json_dict, indent=4)
@@ -325,18 +336,21 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
             with open(os.path.join(output_directory,rec_tail+'.json'), "w") as f:
                 f.write(json_object)
 
+        # Update output files
         outfile_array.append(outfile)
+        if separate_leads:
+            leadfile_array.append(leadfiles)
         start  += int(rate*abs_lead_step)
 
     # For debugging
-    print(f"\nRecordings: {len(recording)} leads")
-    for rec in recording:
-        print(f"{len(rec)} measurements")
+    #print(f"\nRecordings: {len(recording)} leads")
+    #for rec in recording:
+    #    print(f"{len(rec)} measurements")
     
-    print(f"\nExtracted segmented ECG data: {len(segmented_ecg_data)} traces")
-    for lead, data in segmented_ecg_data.items():
-        print(f"Lead {lead}: {len(data)} samples")
+    #print(f"\nExtracted segmented ECG data: {len(segmented_ecg_data)} traces")
+    #for lead, data in segmented_ecg_data.items():
+    #    print(f"Lead {lead}: {len(data)} samples")
     
-    print(f"outfile: {outfile}")
+    #print(f"outfile: {outfile}")
 
-    return outfile_array
+    return outfile_array, leadfile_array

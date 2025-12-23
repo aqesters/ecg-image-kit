@@ -133,7 +133,7 @@ def run_single_file(args):
 
         configs = read_config_file(os.path.join(os.getcwd(), args.config_file))
 
-        out_array = get_paper_ecg(input_file=filename,header_file=header, configs=configs, 
+        out_array, leadfile_array = get_paper_ecg(input_file=filename,header_file=header, configs=configs, 
                                   mask_unplotted_samples=args.mask_unplotted_samples, 
                                   start_index=args.start_index, store_configs=args.store_config, 
                                   store_text_bbox=args.lead_name_bbox, output_directory=args.output_directory,
@@ -143,7 +143,12 @@ def run_single_file(args):
                                   bbox = args.lead_bbox, columns = args.num_columns, seed=args.seed, 
                                   grid_units=args.grid_units, separate_leads=args.separate_leads)
         
-        for out in out_array:
+        print(f"out_array: {out_array}")
+        print(f"leadfile_array: {leadfile_array}")
+        
+        # Add noise and augmentations to generated images
+        for i in range(len(out_array)):
+            out = out_array[i]
             if args.store_config:
                 rec_tail, extn = os.path.splitext(out)
                 with open(rec_tail  + '.json', 'r') as file:
@@ -159,7 +164,7 @@ def run_single_file(args):
                 wrinkles = args.wrinkles
                 augment = args.augment
             
-            #Handwritten text addition
+            # Handwritten text addition
             if(hw_text):
                 num_words = args.num_words if (args.deterministic_num_words) else random.choice(range(2,args.num_words+1))
                 x_offset = args.x_offset if (args.deterministic_offset) else random.choice(range(1,args.x_offset+1))
@@ -195,25 +200,32 @@ def run_single_file(args):
                 json_dict['number_of_creases_horizontally'] = num_creases_horizontally
                 json_dict['number_of_creases_vertically'] = num_creases_vertically
 
+            # Augmentations: noise, crop, rotation, temperature
             if(augment):
-                noise = args.noise if (args.deterministic_noise) else random.choice(range(1,args.noise+1))
-            
-                if(not args.lead_bbox):
-                    do_crop = random.choice((True,False))
-                    if(do_crop):
-                        crop = args.crop
-                    else:
-                        crop = args.crop
-                else:
-                    crop = 0
-                blue_temp = random.choice((True,False))
+                noise = args.noise if (args.deterministic_noise) else random.choice(range(1, args.noise+1))
+                rotate = args.rotate if (args.deterministic_rot) else random.randint(-args.rotate, args.rotate)
+                crop = args.crop if (args.deterministic_crop) else random.uniform(0, args.crop)
+                temp = args.temperature if (args.deterministic_temp) else random.choice(range(1, args.temperature+1))
 
-                if(blue_temp):
-                    temp = random.choice(range(2000,4000))
-                else:
-                    temp = random.choice(range(10000,20000))
-                rotate = args.rotate
-                out = get_augment(out,output_directory=args.output_directory,rotate=args.rotate,noise=noise,crop=crop,temperature=temp,bbox = args.lead_bbox, store_text_bounding_box = args.lead_name_bbox, json_dict = json_dict)
+                #if(not args.lead_bbox):
+                #    do_crop = random.choice((True,False))
+                #    if(do_crop):
+                #        crop = args.crop
+                #    else:
+                #        crop = args.crop
+                #else:
+                #    crop = 0
+                #blue_temp = random.choice((True,False))
+
+                #if(blue_temp):
+                #    temp = random.choice(range(2000,4000))
+                #else:
+                #    temp = random.choice(range(10000,20000))
+                #rotate = args.rotate
+                out = get_augment(out,output_directory=args.output_directory,
+                                  rotate=rotate,noise=noise,crop=crop,temperature=temp,
+                                  bbox = args.lead_bbox, store_text_bounding_box = args.lead_name_bbox, 
+                                  json_dict = json_dict)
             
             else:
                 crop = 0
@@ -255,6 +267,13 @@ def run_single_file(args):
                 img = Image.fromarray(img)
                 img.save(out)
 
+            # Add augmentations to lead images
+            for leadfile in leadfile_array[i]:
+                if(augment):
+                    leadfile = get_augment(leadfile,output_directory=args.output_directory,
+                                           rotate=rotate, noise=0, crop=crop, temperature=None,
+                                           bbox = False, store_text_bounding_box = False, 
+                                           json_dict = json_dict)
 
         return len(out_array)
 
