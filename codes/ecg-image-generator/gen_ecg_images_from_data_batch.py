@@ -71,6 +71,9 @@ def get_parser():
     parser.add_argument('--augment',action='store_true',default=False)
     parser.add_argument('--lead_bbox',action='store_true',default=False)
 
+    parser.add_argument('--remove_grid_units',action='store_false',default=True,dest='grid_units')
+    parser.add_argument('--separate_leads', action='store_true', default=False)
+    
     return parser
 
 def run(args):

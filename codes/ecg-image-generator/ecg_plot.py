@@ -89,7 +89,10 @@ def ecg_plot(
         json_dict=dict(),
         start_index=-1,
         store_configs=0,
-        lead_length_in_seconds=10
+        lead_length_in_seconds=10,
+        grid_units=True,
+        separate_leads=False,
+        show_dividers=True
         ):
     #Inputs :
     #ecg - Dictionary of ecg signal with lead names as keys
@@ -176,8 +179,7 @@ def ecg_plot(
 
     fig.suptitle(title)
 
-    #Mark grid based on whether we want black and white or colour
-    
+    # Mark grid based on whether we want black and white or colour
     if (style == 'bw'):
         color_major = (0.4,0.4,0.4)
         color_minor = (0.75, 0.75, 0.75)
@@ -219,40 +221,66 @@ def ecg_plot(
     if(show_dc_pulse):
         dc_offset = sample_rate*standard_values['dc_offset_length']*step
     #Iterate through each lead in lead_index array.
-    y_offset = (row_height/2)
+    y_offset_base = (row_height/2)
     x_offset = 0
 
     leads_ds = []
 
-    leadNames_12 = configs['leadNames_12']
+    leadNames_12 = configs['leadNames_12']  # order of leads on ECG paper, starting from 3rd row going left to right 
     tickLength = configs['tickLength']
     tickSize_step = configs['tickSize_step']
 
+    # Create dc pulse wave to plot at the beginning of plot. Dc pulse will be 0.2 seconds
+    x_range = np.arange(0,sample_rate*standard_values['dc_offset_length']*step + 4*step,step)
+    dc_pulse = np.ones(len(x_range))
+    dc_pulse = np.concatenate(((0,0),dc_pulse[2:-2],(0,0)))
+
+    # Loop thru all leads
+    leadName_index = -1
+    leadName = ''
+
     for i in np.arange(len(lead_index)):
         current_lead_ds = dict()
-
-        if len(lead_index) == 12:
-            leadName = leadNames_12[i]
+        if separate_leads:   # When plotting each lead on separate images
+            if lead_index[i] == '':     # Skip empty leads
+                continue
+            else:                       # For all other leads
+                leadName = lead_index[i]
+                leadName_index = leadNames_12.index(leadName)
+        
+        else:   # When plotting all leads on same image
+            leadName_index = i
+            if len(lead_index) == 12:
+                leadName = leadNames_12[i]
+            else:
+                leadName = lead_index[i]
+       
+        # Find position of lead on ECG paper
+        # row index from bottom to top, [0, 1, ..., # of rows - 1]
+        # column index from left to right, [0, 1, ..., # of columns - 1]
+        if leadName_index == -1:    
+            row_index = 0
+            col_index = 0
+            leadName = full_mode    # index not found, must be full mode lead
         else:
-            leadName = lead_index[i]
-        #y_offset is computed by shifting by a certain offset based on i, and also by row_height/2 to account for half the waveform below the axis
-        if(i%columns==0):
+            row_index = leadName_index // columns + (full_mode != 'None')           
+            col_index = leadName_index % columns            
 
-            y_offset += row_height
+        # Use row and column positions to calculate X and Y offsets
+        x_offset = col_index * secs
+        y_offset = y_offset_base + (row_index * row_height)
+        
+        #if(i%columns==0):
+            #y_offset += row_height
         
         #x_offset will be distance by which we shift the plot in each iteration
-        if(columns>1):
-            x_offset = (i%columns)*secs
+        #if(columns>1):
+        #    x_offset = (i%columns)*secs
             
-        else:
-            x_offset = 0
+        #else:
+        #    x_offset = 0
 
-        #Create dc pulse wave to plot at the beginning of plot. Dc pulse will be 0.2 seconds
-        x_range = np.arange(0,sample_rate*standard_values['dc_offset_length']*step + 4*step,step)
-        dc_pulse = np.ones(len(x_range))
-        dc_pulse = np.concatenate(((0,0),dc_pulse[2:-2],(0,0)))
-
-        #Print lead name at .5 ( or 5 mm distance) from plot
+        # Print lead name at .5 ( or 5 mm distance) from plot
         if(show_lead_name):
             t1 = ax.text(x_offset + x_gap + dc_offset, 
                     y_offset-lead_name_offset - 0.2, 
@@ -280,7 +308,7 @@ def ecg_plot(
 
         current_lead_ds["lead_name"] = leadName
 
-        #If we are plotting the first row-1 plots, we plot the dc pulse prior to adding the waveform
+        # If we are plotting the first row-1 plots, we plot the dc pulse prior to adding the waveform
         if(columns == 1 and i in np.arange(0,rows)):
             if(show_dc_pulse):
                 #Plot dc pulse for 0.2 seconds with 2 trailing and leading zeros to get the pulse
@@ -295,9 +323,9 @@ def ecg_plot(
                     bb = t1[0].get_window_extent()                                                
                     x1, y1 = bb.x0*resolution/fig.dpi, bb.y0*resolution/fig.dpi
                     x2, y2 = bb.x1*resolution/fig.dpi, bb.y1*resolution/fig.dpi
-                    
-                
-        elif(i%columns == 0):
+
+        # Plot dc pluse for leads in first column             
+        elif(col_index == 0):  
             if(show_dc_pulse):
                 #Plot dc pulse for 0.2 seconds with 2 trailing and leading zeros to get the pulse
                 t1 = ax.plot(np.arange(0,sample_rate*standard_values['dc_offset_length']*step + 4*step,step) + x_offset + x_gap,
@@ -312,6 +340,7 @@ def ecg_plot(
                     x1, y1 = bb.x0*resolution/fig.dpi, bb.y0*resolution/fig.dpi
                     x2, y2 = bb.x1*resolution/fig.dpi, bb.y1*resolution/fig.dpi
 
+        # Plot waveform for lead
         t1 = ax.plot(np.arange(0,len(ecg[leadName])*step,step) + x_offset + dc_offset + x_gap, 
                 ecg[leadName] + y_offset,
                 linewidth=line_width, 
@@ -321,6 +350,7 @@ def ecg_plot(
         x_vals = np.arange(0,len(ecg[leadName])*step,step) + x_offset + dc_offset + x_gap
         y_vals = ecg[leadName] + y_offset
 
+        # Bounding box
         if (bbox):
             renderer1 = fig.canvas.get_renderer()
             transf = ax.transData.inverted()
@@ -361,14 +391,16 @@ def ecg_plot(
 
         leads_ds.append(current_lead_ds)
 
-        if columns > 1 and (i+1)%columns != 0:
-            sep_x = [len(ecg[leadName])*step + x_offset + dc_offset + x_gap] * round(tickLength*y_grid_dots)
-            sep_x = np.array(sep_x)
-            sep_y = np.linspace(y_offset - tickLength/2*y_grid_dots*tickSize_step, y_offset + tickSize_step*y_grid_dots*tickLength/2, len(sep_x))
-            ax.plot(sep_x, sep_y, linewidth=line_width * 3, color=color_line)
+        # Plot vertical borders between leads
+        if show_dividers:
+            if columns > 1 and (i+1)%columns != 0:
+                sep_x = [len(ecg[leadName])*step + x_offset + dc_offset + x_gap] * round(tickLength*y_grid_dots)
+                sep_x = np.array(sep_x)
+                sep_y = np.linspace(y_offset - tickLength/2*y_grid_dots*tickSize_step, y_offset + tickSize_step*y_grid_dots*tickLength/2, len(sep_x))
+                ax.plot(sep_x, sep_y, linewidth=line_width * 3, color=color_line)
 
     #Plotting longest lead for 12 seconds
-    if(full_mode!='None'):
+    if(full_mode!='None') and (('full'+full_mode) in ecg.keys()):
         current_lead_ds = dict()
         if(show_lead_name):
             t1 = ax.text(x_gap + dc_offset, 
@@ -482,9 +514,10 @@ def ecg_plot(
                 ax.text(x_offset, y_offset, line, fontsize=lead_fontsize)
                 y_offset -= 0.5
 
-    #change x and y res
-    ax.text(2, 0.5, '25mm/s', fontsize=lead_fontsize)
-    ax.text(4, 0.5, '10mm/mV', fontsize=lead_fontsize)
+    # Change x and y res
+    if grid_units:
+        ax.text(2, 0.5, '25mm/s', fontsize=lead_fontsize)
+        ax.text(4, 0.5, '10mm/mV', fontsize=lead_fontsize)
     
     if(show_grid):
         ax.set_xticks(np.arange(x_min,x_max,x_grid_size))    
