@@ -292,7 +292,7 @@ def get_paper_ecg(input_file,header_file,output_directory, seed, add_dc_pulse,ad
                                 grid_units=grid_units, separate_leads=False, show_dividers=True)
         
         # If selected, also plot each lead in separate images
-        leadfiles = []
+        leadfiles = [] 
         if separate_leads:
             for key, data in ecg_frame[i].items():
                 lead_file = rec_file + '-' + key    # File name for each lead
