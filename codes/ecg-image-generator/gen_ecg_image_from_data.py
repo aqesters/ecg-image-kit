@@ -101,9 +101,11 @@ def writeCSV(args):
                 writer.writerow(["filename","xgrid","ygrid","lead_name","start","end"])
 
 def run_single_file(args):
-        if hasattr(args, 'st') == True:
-            random.seed(args.seed)
+        if hasattr(args, 'add_qr_code'):
             args.encoding = args.input_file
+
+        if hasattr(args, 'seed') and args.seed != -1:
+            random.seed(args.seed)
 
         filename = args.input_file
         header = args.header_file
@@ -275,7 +277,7 @@ def run_single_file(args):
                                            bbox = False, store_text_bounding_box = False, 
                                            json_dict = json_dict)
 
-        return len(out_array)
+        return out_array, leadfile_array
 
 if __name__=='__main__':
     path = os.path.join(os.getcwd(), sys.argv[0])
